@@ -5,61 +5,85 @@ output:
   html_document:
     keep_md: true
 ---
-# 1: TITLE: DATASET ANALYSIS FROM NOAA TO IDENTIFY HEALTH AND ECONOMIC POPULATION CONSEQUENCES IN THE UNITED STATES CAUSED BY STORMS AND WEATHER EVENTS
+# 1: Title: Health/Economic Consequences in U.S. caused by Storms ans Weather Events
 
 
 ## INTRODUCTION
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
 
-This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+This Data Science Project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
 
+Look to link: [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf). At pag.51 there of this document, there is an example, evolving Hurricane Andrew where the powerful winds resulted in 4 fatalities, 50 injuries, $13B in property damage and $ 750M in crop damage.
 
-# 2: SYNOPSIS: QUESTIONS TO BE ANSWERED
-This report address the following questions:
+Notation Example pag.51: FLZ018-021 >023 24 0325EST 4 50 13B 750M Hurricane/Typhoon 0900EST
 
-1 - Across the United States, which types of events are most harmful with respect to population health?
+# 2: PROJECT SYNOPSIS: 
+This report address questions related to Weather Events and Storms that are most damaging in terms of Fatalities, Injuries and damages at properties and crop using the NOAA database. 
+The mainly questions to be answered are:
+1 - Which types of events are most harmful with respect to population health?
+2 - Which types of events have the greatest economic consequences?
 
-2 - Across the United States, which types of events have the greatest economic consequences?
+# 3: LOADING THE DATA
 
+### 3.1 - Using R libraries
 
-# 3: LOADING AND PRE-PROCESSING THE DATA
-
-* Defining libraries
-
-```{r}
+```{r, echo=TRUE}
 getwd()
 library(knitr)
 library(markdown)
 library(rmarkdown)
 library(plyr)
 library(dplyr)
-library(Hmisc)
+library(stats)
+library(R.utils)
 ```
 
-* Loading the data NOAA storm data into R
+* This analysis was done at iMac i5 3.1 Ghz with 8GB RAM and 1TB of Disk.
+
+```{r, echo=TRUE}
+sessionInfo()
+```
+
+### 3.2 - Loading the data NOAA storm data into R
 
 ```{r, echo=TRUE}
 if (!file.exists("repdata-data-StormData.csv")) {
         download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "repdata_data_StormData.csv.bz2")
 }
 storm <- read.csv(file = "repdata-data-StormData.csv", header = TRUE, sep = ",")
-```
-
-* Rows and Columns of Data
-```{r, echo=TRUE}
 dim(storm)
-```
-* The Dataset has 902297 rows (observations) and 37 columns (variables). 
-* The variables are:
-```{r, echo=TRUE}
 names(storm)
 str(storm)
 ```
 
-* See two Observations of STORM Dataset
+### 3.3 - Wrangling the Data
+
+* Defining variables that will be used:
+EVTYPE: Event Type (Tornados, Flood, ....)
+FATALITIES: Number of Fatalities
+INJURIES: Number of Injuries
+PROGDMG: Property Damage + PROPDMGEXP: Units for Property Damage (K,M,B)
+CROPDMG: Crop Damage + CROPDMGEXP: Units for Crop Damage (K,BM,B)
 
 ```{r, echo=TRUE}
-head(storm, n=2)
+varsNedeed <- c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+storm <- storm[varsNedeed]
+dim(storm)
+names(storm)
+str(storm)
+head(storm)
+```
+
+* Refactor and redefining values for the PROGDMGEXP variable
+```{r, echo=TRUE}
+unique(storm$PROPDMGEXP)
+storm$PROPDMGEXP <- mapvalues(storm$PROPDMGEXP, from = c("K", "M","", "B", "m", "+", "0", "5", "6", "?", "4", "2", "3", "h", "7", "H", "-", "1", "8"), to = c(10^3, 10^6, 1, 10^9, 10^6, 1,1,10^5, 10^6,1,10^4,10^2,10^3,10^3,10^7,10^3,1,1,10^8))
+```
+
+* Refactor and redefining values for CROPDMGEXP variable
+```{r, echo=TRUE}
+unique(storm$CROPDMGEXP)
+storm$CROPDMGEXP <- mapvalues(storm$CROPDMGEXP, from = c("M", "K", "m", "B", "?", "0", "k","2"), to = c(10^6, 10^3, 10^6, 10^9, 1, 1, 10^3, 10^2))
 ```
 
 
@@ -68,25 +92,25 @@ head(storm, n=2)
 Lets answer the question about Which Types of Events are most Harmful for population HEALTH?
 
 
-## 4.1 - WHICH TYPES OF EVENTS THAT ARE MOST HARMFUL TO POPULATION HEALTH?
+## 4.1 - WHICH TYPES OF EVENTS ARE MOST HARMFUL TO POPULATION HEALTH?
 
-The item 2.6 (page 9) of National Weather Service Storm Data documentation describes about Fatalities and Injuries. So, it is necessary to assess theses Variables to define which of EVENTS (EVTYPE) are most harmful. If you want, connect with National Weather Service using the link [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
+The item 2.6 (page 9) of National Weather Service Storm Data documentation describes about Fatalities and Injuries. So, it is necessary to assess these Variables to define which of EVENTS (EVTYPE) are most harmful. Look to link: [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
 
-* Lets evaluate the number of FATALITIES and INJURIES per Type of Event (EVTYPE)
+* Lets to evaluate the number of FATALITIES and INJURIES per Type of Event (EVTYPE)
 
-* NUMBER of FATALITIES per EVENT:
+### 4.1.1 - NUMBER OF FATALITIES PER EVENT
 
 ```{r, echo= TRUE}
 sumFatalities <- aggregate(FATALITIES ~ EVTYPE, data = storm,  FUN="sum")
-sumFatalities  ## 985 observations
+dim(sumFatalities)  ## 985 observations
 ```
 
-* We have 985 observations, which is a great number of Events to present in a Plot. So, lets stay just with the 10 most harmful events.
-
+* We have 985 observations, which is a great number of Events to present in a Plot.
 * Ordering Number of Fatalities and defining the top 10 Weather events in this category
 
 ```{r, echo=TRUE}
 fatalities10events <- sumFatalities[order(-sumFatalities$FATALITIES), ][1:10, ]
+dim(fatalities10events)
 fatalities10events
 ```
 
@@ -99,20 +123,21 @@ dev.copy(png, "fatalities-events.png", width = 480, height = 480)
 dev.off()
 ```
 
-* Now, using the same reasoning, let's evaluate the Number of INJURIES per type of Event (EVTYPE)
 
+### 4.1.2 - NUMBER OF INJURIES PER EVENT
+
+Using the same reasoning of Fatalities, let's evaluate the Number of Injuries per type of Event (EVTYPE)
 
 ```{r, echo= TRUE}
 sumInjuries <- aggregate(INJURIES ~ EVTYPE, data = storm,  FUN="sum")
-sumInjuries  ## 985 observations
+dim(sumInjuries)  ## 985 observations
 ```
-
-* We have 985 observations, which is a great number of Events to present in a Plot. So, lets stay just with the 10 most harmful events.
 
 * Ordering Number of INJURIES and defining the top 10 Weather events in this category
 
 ```{r, echo=TRUE}
 injuries10events <- sumInjuries[order(-sumInjuries$INJURIES), ][1:10, ]
+dim(injuries10events)
 injuries10events
 ```
 
@@ -125,19 +150,13 @@ dev.copy(png, "injuries-events.png", width = 480, height = 480)
 dev.off()
 ```
 
-* You can observe looking tho the Plots that TORNADOS events causes the greatest number of Fatalities and Injuries.  
-
-
-################# 
-
-
 
 ## 4.2 - WHICH TYPES OF EVENTS HAVE THE GREATES ECONOMIC CONSEQUENCES?
 
-
 The item 2.7 (page 12 and the APPENDIX B) of National Weather Service Storm Data documentation describes about Damage. Two variables, PROPDMG (for Property Damage) and CROPDMG (for Crop Damage) are used to represent these losts. If you want, read more about this damages, please connect with National Weather Service using the link [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf)
 
-### PREPARING THE DATA FOR PROPERTIES DAMAGES
+### 4.2.1 - PREPARING THE DATA FOR PROPERTIES DAMAGES
+
 ```{r, echo=TRUE}
 
 
@@ -148,7 +167,6 @@ The item 2.7 (page 12 and the APPENDIX B) of National Weather Service Storm Data
 
 ### PROPERTY DAMAGE
 
- 
 
 ```{r, echo= TRUE}
 sumPropertyevents <- aggregate(PROPDMG ~ EVTYPE, data = storm,  FUN="sum")
@@ -175,170 +193,9 @@ dev.off()
 
 
 
-
-
-
 # 5: RESULTS AND CONCLUSIONS
 
 
-
-
-
-
-## las
-
-## saving the plot
-dev.copy(png,'hist-total-steps.png',  width = 480, height = 480)
-dev.off()
-```
-
-* Lets Evaluate the number of 
-
-
-
-# CODIGO DA SEMANA 2
-
-
-
-* Calculate the sum of steps taken by day
-
-```{r, echo= TRUE}
-sumFatalities <- aggregate(FATALITIES ~ EVTYPE, data = storm,  FUN="sum")
-sumFatalities
-```
-
-* Histogram of the total number of steps taken each day.
-
-```{r, echo = TRUE}
-hist(sumFatalities$FATALITIES, col = 'blue',  xlab = 'EVTYPE', main = "Fatalities per Event")
-
-## saving the plot
-dev.copy(png,'hist-total-steps.png',  width = 480, height = 480)
-dev.off()
-```
-
-* Calculate the mean and median of the total number of steps taken per day 
-
-* Total Mean Steps taken per day
-```{r, echo = TRUE}
-meanStepsPerDay <- aggregate(steps ~ date, data = activity, FUN = "mean")
-meanStepsPerDay
-totalMeanSteps <- mean(sumSteps$steps)
-totalMeanSteps
-```
-
-* Total Median Steps 
-```{r, echo = TRUE}
-totalMedianSteps <- median(sumSteps$steps)
-totalMedianSteps
-```
-
-
-## 3 - What is the average daily activity pattern?
-
-* Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
-
-```{r, echo=TRUE}
-averageSteps <- aggregate(steps~interval, data=activity, FUN="mean")
-averageSteps
-```
-
-* Time series plot of the average number of steps taken
-
-```{r, echo=TRUE}
-plot(x = averageSteps$interval, y = averageSteps$steps, type = "l", lwd=2, xlab = "Intervals",
-     ylab = "Average number of steps", main = "Average Daily activity Pattern")
-## saving the plot
-dev.copy(png,'average-number-steps.png',  width = 480, height = 480)
-dev.off()
-```
-
-
-* Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of step
-
-```{r, echo=TRUE}
-averageSteps[which.max(averageSteps$steps),]
-averageSteps[which.max(averageSteps$steps),]$interval
-
-```
-
-
-## 4 - Strategy of Imputing Missing Values
-
-* Total number of missing values (total rows with NAs) 
-
-```{r, echo=TRUE}
-missingValues <- is.na(activity$steps)
-table(missingValues)
-```
-
-* Creating a New Dataset (wrangling it). Filling the missing data with average.
-
-```{r, echo=TRUE}
-newDataset <- activity
-newDataset$steps <- with(newDataset,impute(steps,mean))
-newDataset$date <- as.Date(newDataset$date)
-str(newDataset)
-sumNewdataset <- aggregate(steps ~ date, data = newDataset, FUN = "sum", na.rm = TRUE)
-sumNewdataset
-```
-
-* Histogram of the total number of steps taken each day after missing values are imputed.
-
-```{r, echo=TRUE}
-hist(sumNewdataset$steps, main="Steps Per Day By Frequency",xlab="Daily Steps")
-## saving the plot
-dev.copy(png,'steps-each-day.png',  width = 480, height = 480)
-dev.off()
-```
-
-* Mean and Median of newDataset
-
-```{r, echo=TRUE}
-mean(sumNewdataset$steps, na.rm = TRUE)
-median(sumNewdataset$steps, na.rm = TRUE)
-```
-
-
-## 5 - Are there differences in activity patterns between weekdays and weekends?
-* Use function Weekdays()
-
-```{r, echo=TRUE}
-dataWeek <- transform(newDataset, day = weekdays(date))
-```
-
-
-* Create a new factor variable in the dataset with two levels ??? ???weekday??? and ???weekend??? indicating whether a given date is a weekday or weekend day.
-
-```{r, echo=TRUE}
-weekdays <- c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')
-weekdays
-dataWeek$weekClass <- factor(dataWeek$day %in% weekdays, 
-                          levels=c(FALSE, TRUE), labels = c("weekend", "weekday"))
-```
-
-* Subsetting the Data in Weekdays and Weekend
-```{r, echo=TRUE}
-weekends <- dataWeek[dataWeek$weekClass=="weekend",]
-weekendSum <- aggregate(steps ~ interval, data=weekends, FUN="sum")
-
-weekdays <- dataWeek[dataWeek$weekClass=="weekday",]
-weekdaySum <- aggregate(steps ~ interval, data=weekdays, FUN="sum")
-
-```
-
-* Make a panel plot containing a time series plot (i.e. ???????????????? = "????") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
-
-```{r}
-par(mfrow=c(2,1))
-plot(weekdaySum$interval, weekdaySum$steps, ylab = "Weekday Steps", xlab = "Weekdays Interval ", type="l", main="Weekday Activity")
-
-plot(weekendSum$interval, weekendSum$steps, ylab = "Weekend Steps", xlab = "Weekends Interval", type="l", main="Weekend Activity")
-
-## saving the plot
-dev.copy(png,'data-weekdays-weekend.png',  width = 480, height = 480)
-dev.off()
-```
 
  
 
